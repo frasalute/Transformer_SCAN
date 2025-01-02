@@ -1,7 +1,7 @@
 import sys
 import json
 import matplotlib.pyplot as plt
-sys.path.append('/work/ATNLP-Project')
+sys.path.append('/Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN')
 from train_beamsearch import train
 import torch
 import numpy as np
@@ -41,8 +41,8 @@ def run_experiment():
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     }
 
-    train_path = "data/length_split/tasks_train_length.txt"
-    test_path = "data/length_split/tasks_test_length.txt"
+    train_path = "/Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN/data/length_split/tasks_train_length.txt"
+    test_path = "/Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN/data/length_split/tasks_test_length.txt"
     model_suffix = "length"
 
     # Set random seed for reproducibility
@@ -50,6 +50,18 @@ def run_experiment():
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     np.random.seed(seed)
+
+    # Create a subset for testing
+    full_test_dataset = SCANDataset(test_path)
+    subset_size = len(full_test_dataset) // 3  # Use 33% of the data because I don't have a lot of computational resources 
+    indices = range(subset_size)
+
+    def subset_loader(dataset, indices):
+        """Helper to create a subset DataLoader."""
+        subset = torch.utils.data.Subset(dataset, indices)
+        return subset
+
+    test_subset_loader = subset_loader(full_test_dataset, indices)
 
     # Run training
     print(f"Starting training for Experiment 2 (Length Split)")
