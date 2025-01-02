@@ -6,6 +6,7 @@ from train_beamsearch import train
 import torch
 import numpy as np
 from dataset import SCANDataset
+from torch.utils.data import DataLoader, Subset
 
 
 def get_dataset_pairs():
@@ -83,6 +84,7 @@ def run_all_variations(n_runs=1):
         "dropout": 0.05,
         "learning_rate": 7e-4,
         "batch_size": 64,
+         "epochs": 20,
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     }
 
@@ -99,17 +101,23 @@ def run_all_variations(n_runs=1):
             try:
                 # Dynamically calculate epochs
                 train_dataset = SCANDataset(train_path)
+                test_dataset = SCANDataset(test_path)  
                 dataset_size = len(train_dataset)
                 epochs = max(1, 100000 // dataset_size)
                 hyperparams["epochs"] = epochs
 
                 print(f"Dataset size: {dataset_size}, Training for {epochs} epochs")
 
+                # Subset the test data for beam search
+                subset_size = len(test_dataset) // 3 # 33% because I don't have a lot of computational power
+                test_subset = Subset(test_dataset, range(subset_size))
+                test_loader = DataLoader(test_subset, batch_size=hyperparams["batch_size"], shuffle=False)
+
                 # Call train with all required arguments
                 model_suffix = f"p_{size}"
                 model, token_acc, seq_acc = train(
-                    train_path=train_path,
-                    test_path=test_path,
+                    train_path=train_dataset,
+                    test_path=test_loader,  # Pass test_loader for evaluation
                     hyperparams=hyperparams,
                     model_suffix=model_suffix,
                     random_seed=seed,

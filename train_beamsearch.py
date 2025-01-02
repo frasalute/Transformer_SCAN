@@ -235,7 +235,7 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
                 max_len=tgt.size(1),
                 start_symbol=bos_idx,
                 end_symbol=eos_idx,
-                beam_size=5,
+                beam_size=3,
                 device=hyperparams["device"],
                 pad_idx=pad_idx,
             )
