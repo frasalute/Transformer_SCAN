@@ -144,17 +144,19 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
     CHECKPOINT_DIR = Path("checkpoints")
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
+    # Initialize datasets and dataloaders
     train_dataset = SCANDataset(train_path)
     test_dataset = SCANDataset(test_path)
 
     train_loader = DataLoader(train_dataset, batch_size=hyperparams["batch_size"], shuffle=True, num_workers=4)
     test_loader = DataLoader(test_dataset, batch_size=hyperparams["batch_size"], shuffle=False, num_workers=4)
 
+    # Initialize the model
     model = Transformer(
-        src_vocab_size=train_dataset.src_vocab.vocab_size,
-        tgt_vocab_size=train_dataset.tgt_vocab.vocab_size,
-        src_pad_idx=train_dataset.src_vocab.special_tokens["<PAD>"],
-        tgt_pad_idx=train_dataset.src_vocab.special_tokens["<PAD>"],
+        src_vocab_size=train_dataset.vocab.vocab_size,
+        tgt_vocab_size=train_dataset.vocab.vocab_size,
+        src_pad_idx=train_dataset.vocab.special_tokens["<PAD>"],
+        tgt_pad_idx=train_dataset.vocab.special_tokens["<PAD>"],
         emb_dim=hyperparams["emb_dim"],
         num_layers=hyperparams["n_layers"],
         num_heads=hyperparams["n_heads"],
@@ -162,13 +164,14 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
         dropout=hyperparams["dropout"],
     ).to(hyperparams["device"])
 
-    criterion = nn.CrossEntropyLoss(ignore_index=train_dataset.tgt_vocab.special_tokens["<PAD>"])
+    # Define loss function and optimizer
+    criterion = nn.CrossEntropyLoss(ignore_index=train_dataset.vocab.special_tokens["<PAD>"])
     optimizer = torch.optim.Adam(model.parameters(), lr=hyperparams["learning_rate"])
 
     best_acc = 0.0
-    pad_idx = train_dataset.src_vocab.special_tokens["<PAD>"]
-    bos_idx = train_dataset.src_vocab.special_tokens["<BOS>"]
-    eos_idx = train_dataset.src_vocab.special_tokens["<EOS>"]
+    pad_idx = train_dataset.vocab.special_tokens["<PAD>"]
+    bos_idx = train_dataset.vocab.special_tokens["<BOS>"]
+    eos_idx = train_dataset.vocab.special_tokens["<EOS>"]
 
     print(f"Training for {hyperparams['epochs']} epochs")
     for epoch in range(hyperparams["epochs"]):
@@ -202,6 +205,7 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
         print(f"Token Accuracy: {avg_token_acc:.4f}")
         print(f"Sequence Accuracy: {avg_seq_acc:.4f}")
 
+        # Save the best model
         if avg_seq_acc > best_acc:
             best_acc = avg_seq_acc
             torch.save(
@@ -233,15 +237,13 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
                 end_symbol=eos_idx,
                 beam_size=5,
                 device=hyperparams["device"],
-                pad_idx=pad_idx,  # Pass pad_idx for consistent padding
+                pad_idx=pad_idx,
             )
 
-            # Ensure predictions and targets are the same length
-            pred = pred[:, :tgt.size(1)]  # Truncate if necessary
+            pred = pred[:, :tgt.size(1)]
             token_acc, seq_acc = calculate_accuracy(pred, tgt[:, 1:], pad_idx)
             token_accuracies.append(token_acc)
             seq_accuracies.append(seq_acc)
-
 
     avg_token_acc = sum(token_accuracies) / len(token_accuracies)
     avg_seq_acc = sum(seq_accuracies) / len(seq_accuracies)
@@ -249,3 +251,4 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
     print(f"Final Token Accuracy: {avg_token_acc:.4f}")
     print(f"Final Sequence Accuracy: {avg_seq_acc:.4f}")
     return model, avg_token_acc, avg_seq_acc
+
