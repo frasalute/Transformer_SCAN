@@ -109,7 +109,7 @@ def run_experiment_3(n_runs=1):
             test_dataset = SCANDataset(test_path)
 
             # Use a subset of the test dataset
-            subset_size = len(test_dataset) // 2  # 50% of the test dataset
+            subset_size = len(test_dataset) // 3  # 33% because of computation power limitations
             test_subset = Subset(test_dataset, range(subset_size))
 
             # Run training
