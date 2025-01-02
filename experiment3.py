@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.utils as nn_utils
 from torch.utils.data import DataLoader, random_split
 from dataset import SCANDataset
-from model.transformer import Transformer
+from transformer import Transformer
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score
 import numpy as np
