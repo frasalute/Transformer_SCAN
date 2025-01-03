@@ -1,10 +1,11 @@
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-from train_beamsearch import train
+from train_beamsearch import train, beam_search_decode, calculate_accuracy
 import torch
 from dataset import SCANDataset
-from torch.utils.data import Subset
+from torch.utils.data import Subset, DataLoader
+from tqdm import tqdm
 
 
 def get_add_prim_dataset_pairs():
@@ -111,18 +112,50 @@ def run_experiment_3(n_runs=1):
             # Use a subset of the test dataset
             subset_size = len(test_dataset) // 3  # 33% because of computation power limitations
             test_subset = Subset(test_dataset, range(subset_size))
+            test_loader = DataLoader(test_subset, batch_size=hyperparams["batch_size"], shuffle=False)
 
             # Run training
             try:
                 _, token_acc, seq_acc = train(
-                    train_path=train_dataset,
-                    test_path=test_subset,
+                    train_path=train_path,
+                    test_path=test_path,
                     hyperparams=hyperparams,
                     model_suffix=dataset_name,
                     random_seed=seed,
                 )
-                results[dataset_name].append((token_acc, seq_acc))
-                print(f"Run {run + 1}/{n_runs}: Token Accuracy = {token_acc:.4f}, Sequence Accuracy = {seq_acc:.4f}")
+
+                # Evaluate using the subset with beam search
+                print(f"Evaluating on subset using Beam Search for {dataset_name}")
+                token_accuracies = []
+                seq_accuracies = []
+                pad_idx = train_dataset.vocab.special_tokens["<PAD>"]
+                bos_idx = train_dataset.vocab.special_tokens["<BOS>"]
+                eos_idx = train_dataset.vocab.special_tokens["<EOS>"]
+
+                with torch.no_grad():
+                    for batch in test_loader:
+                        src = batch["src"].to(hyperparams["device"])
+                        tgt = batch["tgt"].to(hyperparams["device"])
+
+                        pred = beam_search_decode(
+                            model=train_dataset,  # Use trained model
+                            src=src,
+                            max_len=tgt.size(1),
+                            start_symbol=bos_idx,
+                            end_symbol=eos_idx,
+                            beam_size=3,
+                            device=hyperparams["device"],
+                            pad_idx=pad_idx,
+                        )
+
+                        token_acc, seq_acc = calculate_accuracy(pred, tgt[:, 1:], pad_idx)
+                        token_accuracies.append(token_acc)
+                        seq_accuracies.append(seq_acc)
+
+                avg_token_acc = sum(token_accuracies) / len(token_accuracies)
+                avg_seq_acc = sum(seq_accuracies) / len(seq_accuracies)
+                results[dataset_name].append((avg_token_acc, avg_seq_acc))
+                print(f"Run {run + 1}/{n_runs}: Token Accuracy = {avg_token_acc:.4f}, Sequence Accuracy = {avg_seq_acc:.4f}")
 
             except Exception as e:
                 print(f"Error during training/testing for {dataset_name}: {e}")
@@ -132,18 +165,6 @@ def run_experiment_3(n_runs=1):
     save_results(results)
     plot_histograms(results)
 
-    # Print results summary
-    print("\nFinal Results Summary:")
-    for dataset, accuracies in results.items():
-        valid_accuracies = [acc for acc in accuracies if acc is not None]
-        if valid_accuracies:
-            token_accuracies = [acc[0] for acc in valid_accuracies]
-            seq_accuracies = [acc[1] for acc in valid_accuracies]
-            print(f"{dataset}:")
-            print(f"  Token Accuracy: Mean = {np.mean(token_accuracies):.4f}, Std = {np.std(token_accuracies):.4f}")
-            print(f"  Sequence Accuracy: Mean = {np.mean(seq_accuracies):.4f}, Std = {np.std(seq_accuracies):.4f}")
-        else:
-            print(f"{dataset}: No valid results (errors encountered)")
 
 if __name__ == "__main__":
     run_experiment_3(n_runs=1)
