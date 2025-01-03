@@ -1,17 +1,18 @@
 import sys
 import json
 import matplotlib.pyplot as plt
-sys.path.append('/work/ATNLP-Project')
-from train_beamsearch import train
+sys.path.append('/Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN')
+from train_beamsearch import train, beam_search_decode, calculate_accuracy
 import torch
 import numpy as np
 from dataset import SCANDataset
 from torch.utils.data import DataLoader, Subset
+from tqdm import tqdm
 
 
 def get_dataset_pairs():
     """Get pairs of training and test dataset paths."""
-    base_path = "/work/ATNLP-Project/data/simple_split/size_variations"
+    base_path = "/Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN/data/simple_split/size_variations"
     sizes = ["1", "2", "4", "8", "16", "32", "64"]
     pairs = []
     for size in sizes:
@@ -84,7 +85,6 @@ def run_all_variations(n_runs=1):
         "dropout": 0.05,
         "learning_rate": 7e-4,
         "batch_size": 64,
-         "epochs": 20,
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     }
 
@@ -101,23 +101,16 @@ def run_all_variations(n_runs=1):
             try:
                 # Dynamically calculate epochs
                 train_dataset = SCANDataset(train_path)
-                test_dataset = SCANDataset(test_path)  
                 dataset_size = len(train_dataset)
-                epochs = max(1, 100000 // dataset_size)
-                hyperparams["epochs"] = epochs
+                hyperparams["epochs"] = min(20, max(1, 100000 // dataset_size))
 
-                print(f"Dataset size: {dataset_size}, Training for {epochs} epochs")
-
-                # Subset the test data for beam search
-                subset_size = len(test_dataset) // 3 # 33% because I don't have a lot of computational power
-                test_subset = Subset(test_dataset, range(subset_size))
-                test_loader = DataLoader(test_subset, batch_size=hyperparams["batch_size"], shuffle=False)
+                print(f"Dataset size: {dataset_size}, Training for {hyperparams['epochs']} epochs")
 
                 # Call train with all required arguments
                 model_suffix = f"p_{size}"
                 model, token_acc, seq_acc = train(
-                    train_path=train_dataset,
-                    test_path=test_loader,  # Pass test_loader for evaluation
+                    train_path=train_path,
+                    test_path=test_path,
                     hyperparams=hyperparams,
                     model_suffix=model_suffix,
                     random_seed=seed,
@@ -157,6 +150,6 @@ def run_all_variations(n_runs=1):
     # Generate histograms
     plot_histograms(results)
 
-
 if __name__ == "__main__":
     run_all_variations(n_runs=1)
+

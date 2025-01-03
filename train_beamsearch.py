@@ -150,7 +150,9 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
 
     train_loader = DataLoader(train_dataset, batch_size=hyperparams["batch_size"], shuffle=True, num_workers=4)
     test_loader = DataLoader(test_dataset, batch_size=hyperparams["batch_size"], shuffle=False, num_workers=4)
-
+    subset_size = len(test_dataset) // 3  # Use 33% of the data
+    test_dataset = torch.utils.data.Subset(test_dataset, range(subset_size))
+    
     # Initialize the model
     model = Transformer(
         src_vocab_size=train_dataset.vocab.vocab_size,

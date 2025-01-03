@@ -1,8 +1,8 @@
 import sys
 import json
 import matplotlib.pyplot as plt
-sys.path.append('/teamspace/studios/this_studio/Transformer_SCAN')
-from train_beamsearch import train
+sys.path.append('/Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN')
+from train_beamsearch import train, beam_search_decode, calculate_accuracy
 import torch
 import numpy as np
 from dataset import SCANDataset
@@ -15,7 +15,6 @@ def save_results(results, filename="experiment2_results.json"):
     with open(filename, "w") as f:
         json.dump(results, f, indent=4)
     print(f"Results saved to {filename}")
-
 
 def plot_accuracy_per_length(results, filename_prefix="experiment2"):
     """Plot accuracy per command and action sequence length."""
@@ -51,6 +50,50 @@ def plot_accuracy_per_length(results, filename_prefix="experiment2"):
     print(f"Action Length Accuracy graph saved to {filename_prefix}_action_length_accuracy.png")
     plt.close()
 
+def analyze_per_length(results, data_loader, model, hyperparams):
+    """Analyze accuracies per command and action sequence lengths."""
+    pad_idx = data_loader.dataset.tgt_vocab.special_tokens["<PAD>"]
+    bos_idx = data_loader.dataset.tgt_vocab.special_tokens["<BOS>"]
+    eos_idx = data_loader.dataset.tgt_vocab.special_tokens["<EOS>"]
+
+    with torch.no_grad():
+        for batch in tqdm(data_loader, desc="Final Evaluation"):
+            src = batch["src"].to(hyperparams["device"])
+            tgt = batch["tgt"].to(hyperparams["device"])
+
+            pred = beam_search_decode(
+                model,
+                src,
+                max_len=tgt.size(1),
+                start_symbol=bos_idx,
+                end_symbol=eos_idx,
+                beam_size=3,
+                device=hyperparams["device"],
+                pad_idx=pad_idx,
+            )
+
+            pred = pred[:, :tgt.size(1)]  # Truncate if necessary
+
+            # Analyze accuracies per command and action sequence lengths
+            for i in range(src.size(0)):
+                cmd_len = torch.count_nonzero(src[i]).item()  # Command length
+                act_len = torch.count_nonzero(tgt[i]).item()  # Action length
+                _, seq_acc = calculate_accuracy(pred[i].unsqueeze(0), tgt[i].unsqueeze(0), pad_idx)
+
+                if cmd_len not in results["command_lengths"]:
+                    results["command_lengths"][cmd_len] = {"accuracy": 0, "count": 0}
+                if act_len not in results["action_lengths"]:
+                    results["action_lengths"][act_len] = {"accuracy": 0, "count": 0}
+
+                results["command_lengths"][cmd_len]["accuracy"] += seq_acc
+                results["command_lengths"][cmd_len]["count"] += 1
+                results["action_lengths"][act_len]["accuracy"] += seq_acc
+                results["action_lengths"][act_len]["count"] += 1
+
+    # Calculate average accuracy per length
+    for length_data in [results["command_lengths"], results["action_lengths"]]:
+        for length, data in length_data.items():
+            data["accuracy"] /= data["count"]
 
 def run_experiment():
     """Run training for Experiment 2."""
@@ -67,8 +110,8 @@ def run_experiment():
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     }
 
-    train_path = "/teamspace/studios/this_studio/Transformer_SCAN/data/length_split/tasks_train_length.txt"
-    test_path = "/teamspace/studios/this_studio/Transformer_SCAN/data/length_split/tasks_test_length.txt"
+    train_path = "Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN/data/length_split/tasks_train_length.txt"
+    test_path = "Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN/data/length_split/tasks_test_length.txt"
     model_suffix = "length"
 
     # Set random seed for reproducibility
@@ -91,75 +134,26 @@ def run_experiment():
     print(f"Starting training for Experiment 2 (Length Split)")
     print("=" * 50)
 
-    try:
-        model, token_acc, seq_acc = train(
-            train_path=train_path,
-            test_path=test_path,
-            hyperparams=hyperparams,
-            model_suffix=model_suffix,
-            random_seed=seed,
-        )
+    model, _, _ = train(
+        train_path=train_path,
+        test_path=test_path,  # Full test dataset used for training validation
+        hyperparams=hyperparams,
+        model_suffix=model_suffix,
+        random_seed=seed,
+    )
 
-        # Perform evaluation on the subset using Beam Search
-        print("\nEvaluating on the subset using Beam Search...")
-        model.eval()
-        pad_idx = full_test_dataset.tgt_vocab.special_tokens["<PAD>"]
-        bos_idx = full_test_dataset.tgt_vocab.special_tokens["<BOS>"]
-        eos_idx = full_test_dataset.tgt_vocab.special_tokens["<EOS>"]
+    # Analyze per-length accuracies
+    results = {
+        "command_lengths": {},
+        "action_lengths": {},
+    }
+    analyze_per_length(results, test_loader, model, hyperparams)
 
-        results = {
-            "command_lengths": {},  # Store results by command length
-            "action_lengths": {},   # Store results by action length
-        }
+    # Save results
+    save_results(results)
 
-        with torch.no_grad():
-            for batch in tqdm(test_loader, desc="Final Evaluation"):
-                src = batch["src"].to(hyperparams["device"])
-                tgt = batch["tgt"].to(hyperparams["device"])
-
-                pred = beam_search_decode(
-                    model,
-                    src,
-                    max_len=tgt.size(1),
-                    start_symbol=bos_idx,
-                    end_symbol=eos_idx,
-                    beam_size=3,  # Adjust as needed
-                    device=hyperparams["device"],
-                    pad_idx=pad_idx,
-                )
-
-                pred = pred[:, :tgt.size(1)]  # Truncate if necessary
-
-                # Analyze accuracies per command and action sequence lengths
-                for i in range(src.size(0)):
-                    cmd_len = torch.count_nonzero(src[i]).item()  # Command length
-                    act_len = torch.count_nonzero(tgt[i]).item()  # Action length
-                    _, seq_acc = calculate_accuracy(pred[i].unsqueeze(0), tgt[i].unsqueeze(0), pad_idx)
-
-                    if cmd_len not in results["command_lengths"]:
-                        results["command_lengths"][cmd_len] = {"accuracy": 0, "count": 0}
-                    if act_len not in results["action_lengths"]:
-                        results["action_lengths"][act_len] = {"accuracy": 0, "count": 0}
-
-                    results["command_lengths"][cmd_len]["accuracy"] += seq_acc
-                    results["command_lengths"][cmd_len]["count"] += 1
-                    results["action_lengths"][act_len]["accuracy"] += seq_acc
-                    results["action_lengths"][act_len]["count"] += 1
-
-        # Calculate average accuracy per length
-        for length_data in [results["command_lengths"], results["action_lengths"]]:
-            for length, data in length_data.items():
-                data["accuracy"] /= data["count"]
-
-        # Save results
-        save_results(results)
-
-        # Plot the graphs
-        plot_accuracy_per_length(results)
-
-    except Exception as e:
-        print(f"Error during Experiment 2: {e}")
-
+    # Plot the graphs
+    plot_accuracy_per_length(results)
 
 if __name__ == "__main__":
     run_experiment()
