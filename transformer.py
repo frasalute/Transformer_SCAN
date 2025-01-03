@@ -51,7 +51,7 @@ class MultiHeadAttention(nn.Module):
 
         # apply mask to attention scores
         if mask is not None:
-            attn_score = attn_score.masked_fill(mask == 0, -1e9)
+            attn_score = attn_score.masked_fill(mask == 0, float('-inf'))
 
         # apply softmax to normalize attention scores
         attn_weights = torch.softmax(attn_score, dim=-1)
@@ -156,15 +156,14 @@ class Encoder(nn.Module):
     def forward(self, x, mask):
         seq_len = x.size(1)
         tok_emb = self.tok_emb(x).to(device=x.device)
-        pos_indices = torch.arange(1, seq_len + 1, device=x.device)  # [seq_len]
-        pos_emb = self.pos_emb(pos_indices)
-        embedding = tok_emb + pos_emb.unsqueeze(0)
+        pos_emb = self.pos_emb(torch.arange(1, seq_len + 1, device=x.device))
+        embedding = tok_emb + pos_emb.unsqueeze(0).repeat(x.size(0), 1, 1)
         embedding = self.dropout(embedding)
 
         for block in self.transformer_blocks:
-            output = block(embedding, embedding, embedding, mask)
+            embedding = block(embedding, embedding, embedding, mask)
 
-        return output
+        return embedding
 
 # Masked Multi-Head Self-Attention -> Cross-Attention with Encoder Output -> Feedforward Network
 class DecoderBlock(nn.Module):
@@ -189,9 +188,9 @@ class DecoderBlock(nn.Module):
         attn = self.dropout(attn)
         attn = self.norm(attn)
 
-        # Cross-Attention with Encoder Output - V and K come from the encoder output
-        output = self.transformer_block(attn, value, key, src_mask)
-
+        # Cross Attention
+        output = self.transformer_block(attn, key, value, src_mask)
+        
         return output
 
 
@@ -211,30 +210,30 @@ class Decoder(nn.Module):
         pos_weight = get_sinusoid_table(max_len + 1, emb_dim)
         self.pos_emb = nn.Embedding.from_pretrained(pos_weight, freeze=True)
         self.tok_emb = nn.Embedding(vocab_size, emb_dim)
-        self.decoder_blocks = nn.ModuleList(
+         self.decoder_blocks = nn.ModuleList(
             [
                 DecoderBlock(emb_dim, num_heads, forward_dim, dropout)
-                for _ in range(num_layers)
+                for i in range(num_layers)
             ]
         )
         self.out_layer = nn.Linear(emb_dim, vocab_size)
 
-
     def forward(self, x, encoder_out, src_mask, tgt_mask):
-        # input x is the taget embedding
         tok_emb = self.tok_emb(x)
         seq_len = x.size(1)
-        pos_indices = torch.arange(1, seq_len + 1, device=x.device)  
-        pos_emb = self.pos_emb(pos_indices)  
+        positions = (
+            torch.arange(seq_len, device=x.device)
+            .unsqueeze(0)
+            .expand(x.size(0), seq_len)
+        )
+        pos_emb = self.pos_emb(positions)
+        embedding = tok_emb + pos_emb
 
-        embedding = tok_emb + pos_emb.unsqueeze(0)  
-        embedding = self.dropout(embedding)
-
-        # Pass Through Decoder Blocks
         for block in self.decoder_blocks:
-            output = block(embedding, encoder_out, encoder_out, src_mask, tgt_mask)
+            embedding = block(embedding, encoder_out, encoder_out, src_mask, tgt_mask)
 
-        output = self.out_layer(output) 
+        output = self.out_layer(embedding)
+
         return output
 
 
