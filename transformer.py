@@ -210,7 +210,7 @@ class Decoder(nn.Module):
         pos_weight = get_sinusoid_table(max_len + 1, emb_dim)
         self.pos_emb = nn.Embedding.from_pretrained(pos_weight, freeze=True)
         self.tok_emb = nn.Embedding(vocab_size, emb_dim)
-         self.decoder_blocks = nn.ModuleList(
+        self.decoder_blocks = nn.ModuleList(
             [
                 DecoderBlock(emb_dim, num_heads, forward_dim, dropout)
                 for i in range(num_layers)
