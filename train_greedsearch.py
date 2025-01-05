@@ -54,8 +54,8 @@ def calculate_accuracy(pred, target, pad_idx):
     seq_acc = (pred_lengths == tgt_lengths).float().mean().item()
 
     # Token-level accuracy
-    pred_flat = pred.view(-1)
-    tgt_flat  = target.view(-1)
+    pred_flat = pred.reshape(-1)
+    tgt_flat  = target.reshape(-1)
     valid_mask = (tgt_flat != pad_idx)
     correct = (pred_flat[valid_mask] == tgt_flat[valid_mask]).float()
     token_acc = correct.mean().item()
@@ -86,7 +86,7 @@ def evaluate(model, data_loader, criterion, pad_idx, device):
             total_loss += loss.item()
 
             # Calculate teacher-forced token/seq accuracy
-            pred = out.argmax(dim=-1).view(tgt.size(0), -1)
+            pred = out.argmax(dim=-1).reshape(tgt.size(0), -1)
             tok_acc, s_acc = calculate_accuracy(pred, tgt[:, 1:], pad_idx)
             token_accs.append(tok_acc)
             seq_accs.append(s_acc)
@@ -155,8 +155,8 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
 
             optimizer.zero_grad()
             out = model(src, tgt_in)  # teacher-forced pass
-            out = out.view(-1, out.size(-1))
-            tgt_out = tgt_out.view(-1)
+            out = out.reshape(-1, out.size(-1))
+            tgt_out = tgt_out.reshape(-1)
 
             loss = criterion(out, tgt_out)
             loss.backward()
@@ -222,24 +222,3 @@ def main(train_path, test_path, model_suffix, hyperparams, random_seed=42, **kwa
     """
     return train(train_path, test_path, hyperparams, model_suffix, random_seed)
 
-
-if __name__ == "__main__":
-    # Example direct call:
-    example_hparams = {
-        "emb_dim": 128,
-        "n_layers": 1,
-        "n_heads": 8,
-        "forward_dim": 512,
-        "dropout": 0.05,
-        "learning_rate": 7e-4,
-        "batch_size": 64,
-        "epochs": 5,
-        "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    }
-    model, tok_acc, seq_acc = train(
-        "data/simple_split/tasks_train_simple.txt",
-        "data/simple_split/tasks_test_simple.txt",
-        example_hparams,
-        "simple_experiment",
-        random_seed=42
-    )
