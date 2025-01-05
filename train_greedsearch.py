@@ -7,20 +7,20 @@ from transformer import Transformer
 from tqdm import tqdm
 from pathlib import Path
 
+
 def greedy_decode(model, src, max_len, start_symbol, end_symbol, device):
     """Greedy decoding for autoregressive generation."""
     model.eval()
     src = src.to(device)
-    
+
     # Initialize with start symbol
-    ys = torch.ones(src.shape[0], 1).fill_(start_symbol).long().to(device)
-    finished = torch.zeros(src.shape[0], dtype=torch.bool, device=device)
-    
+    ys = torch.ones(src.size(0), 1).fill_(start_symbol).long().to(device)
+    finished = torch.zeros(src.size(0), dtype=torch.bool, device=device)
+
     for _ in range(max_len - 1):
         out = model(src, ys)  # [batch_size, seq_len, vocab_size]
-        # Take the last time step
-        probs = out[:, -1, :]  # [batch_size, vocab_size]
-        next_word = probs.argmax(dim=-1, keepdim=True)  # [batch_size, 1]
+        probs = out[:, -1, :]  # Get probabilities of the last token
+        next_word = probs.argmax(dim=-1, keepdim=True)  # Get the most likely next word
 
         # Update only unfinished sequences
         next_word = torch.where(finished.unsqueeze(1), ys[:, -1:], next_word)
@@ -28,43 +28,44 @@ def greedy_decode(model, src, max_len, start_symbol, end_symbol, device):
 
         # Mark finished if next_word is <EOS>
         is_eos = next_word.squeeze(1) == end_symbol
-        finished = finished | is_eos
+        finished |= is_eos
+
+        # Stop if all sequences are finished
         if finished.all():
             break
+
+    # Truncate sequences after <EOS>
+    for i in range(ys.size(0)):
+        eos_indices = (ys[i] == end_symbol).nonzero(as_tuple=True)[0]
+        if eos_indices.numel() > 0:  # If <EOS> is found
+            ys[i, eos_indices[0] + 1:] = end_symbol  # Truncate at <EOS>
 
     return ys
 
 
 def calculate_accuracy(pred, target, pad_idx):
-    """Calculate token-level and 'sequence length' accuracy."""
+    """Calculate token-level and sequence-level accuracy."""
     batch_size = pred.size(0)
 
-    # Pad sequences if needed to match length
+    # Ensure both are the same length by padding
     max_len = max(pred.size(1), target.size(1))
     if pred.size(1) < max_len:
-        pad_size = (batch_size, max_len - pred.size(1))
-        pred = torch.cat([pred, torch.full(pad_size, pad_idx, device=pred.device)], dim=1)
+        pred = torch.cat([pred, torch.full((batch_size, max_len - pred.size(1)), pad_idx, device=pred.device)], dim=1)
     elif target.size(1) < max_len:
-        pad_size = (batch_size, max_len - target.size(1))
-        target = torch.cat([target, torch.full(pad_size, pad_idx, device=target.device)], dim=1)
-
-    # "Sequence length accuracy" => just checks if #tokens != <PAD> matches
-    pred_lengths = (pred != pad_idx).sum(dim=1)
-    tgt_lengths  = (target != pad_idx).sum(dim=1)
-    seq_acc = (pred_lengths == tgt_lengths).float().mean().item()
+        target = torch.cat([target, torch.full((batch_size, max_len - target.size(1)), pad_idx, device=target.device)], dim=1)
 
     # Token-level accuracy
-    pred_flat = pred.reshape(-1)
-    tgt_flat  = target.reshape(-1)
-    valid_mask = (tgt_flat != pad_idx)
-    correct = (pred_flat[valid_mask] == tgt_flat[valid_mask]).float()
-    token_acc = correct.mean().item()
+    mask = target != pad_idx
+    token_acc = (pred[mask] == target[mask]).float().mean().item()
+
+    # Sequence-level accuracy (exact match)
+    seq_acc = ((pred == target) | ~mask).all(dim=1).float().mean().item()
 
     return token_acc, seq_acc
 
 
 def evaluate(model, data_loader, criterion, pad_idx, device):
-    """Evaluate the model with teacher forcing (standard)."""
+    """Evaluate the model using teacher forcing."""
     model.eval()
     total_loss = 0.0
     token_accs = []
@@ -75,27 +76,27 @@ def evaluate(model, data_loader, criterion, pad_idx, device):
             src = batch["src"].to(device)
             tgt = batch["tgt"].to(device)
 
-            tgt_in  = tgt[:, :-1]
-            tgt_out = tgt[:,  1:]
+            tgt_input = tgt[:, :-1]
+            tgt_output = tgt[:, 1:]
 
-            out = model(src, tgt_in)  # [batch_size, seq_len, vocab_size]
+            out = model(src, tgt_input)  # Teacher forcing
             out = out.reshape(-1, out.size(-1))
-            tgt_out = tgt_out.reshape(-1)
+            tgt_output = tgt_output.reshape(-1)
 
-            loss = criterion(out, tgt_out)
+            loss = criterion(out, tgt_output)
             total_loss += loss.item()
 
-            # Calculate teacher-forced token/seq accuracy
-            pred = out.argmax(dim=-1).reshape(tgt.size(0), -1)
-            tok_acc, s_acc = calculate_accuracy(pred, tgt[:, 1:], pad_idx)
+            # Teacher-forced token and sequence accuracy
+            pred = out.argmax(dim=-1).view(tgt.size(0), -1)
+            tok_acc, seq_acc = calculate_accuracy(pred, tgt[:, 1:], pad_idx)
             token_accs.append(tok_acc)
-            seq_accs.append(s_acc)
+            seq_accs.append(seq_acc)
 
     avg_loss = total_loss / len(data_loader)
-    avg_tok_acc = sum(token_accs) / len(token_accs)
+    avg_token_acc = sum(token_accs) / len(token_accs)
     avg_seq_acc = sum(seq_accs) / len(seq_accs)
 
-    return avg_loss, avg_tok_acc, avg_seq_acc
+    return avg_loss, avg_token_acc, avg_seq_acc
 
 
 def train(train_path, test_path, hyperparams, model_suffix, random_seed):
@@ -109,17 +110,17 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
 
     # Load datasets
     train_data = SCANDataset(train_path)
-    test_data  = SCANDataset(test_path)
+    test_data = SCANDataset(test_path)
 
-    train_loader = DataLoader(train_data, batch_size=hyperparams["batch_size"], shuffle=True, 
+    train_loader = DataLoader(train_data, batch_size=hyperparams["batch_size"], shuffle=True,
                               num_workers=4, pin_memory=True)
-    test_loader  = DataLoader(test_data,  batch_size=hyperparams["batch_size"], shuffle=False,
-                              num_workers=4, pin_memory=True)
+    test_loader = DataLoader(test_data, batch_size=hyperparams["batch_size"], shuffle=False,
+                             num_workers=4, pin_memory=True)
 
-    # Create model
+    # Create the Transformer model
     model = Transformer(
         src_vocab_size=train_data.vocab.vocab_size,
-        tgt_vocab_size=train_data.vocab.vocab_size,  # single vocab for SCAN is typical
+        tgt_vocab_size=train_data.vocab.vocab_size,
         src_pad_idx=train_data.vocab.special_tokens["<PAD>"],
         tgt_pad_idx=train_data.vocab.special_tokens["<PAD>"],
         emb_dim=hyperparams["emb_dim"],
@@ -127,12 +128,11 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
         num_heads=hyperparams["n_heads"],
         forward_dim=hyperparams["forward_dim"],
         dropout=hyperparams["dropout"],
-        max_len=train_data.max_len,
     ).to(hyperparams["device"])
 
-    # Loss + Optim
+    # Loss and optimizer
     criterion = nn.CrossEntropyLoss(ignore_index=train_data.vocab.special_tokens["<PAD>"])
-    optimizer = torch.optim.Adam(model.parameters(), lr=hyperparams["learning_rate"])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=hyperparams["learning_rate"])
 
     pad_idx = train_data.vocab.special_tokens["<PAD>"]
     bos_idx = train_data.vocab.special_tokens["<BOS>"]
@@ -150,15 +150,15 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
             src = batch["src"].to(hyperparams["device"])
             tgt = batch["tgt"].to(hyperparams["device"])
 
-            tgt_in  = tgt[:, :-1]
-            tgt_out = tgt[:,  1:]
+            tgt_input = tgt[:, :-1]
+            tgt_output = tgt[:, 1:]
 
             optimizer.zero_grad()
-            out = model(src, tgt_in)  # teacher-forced pass
+            out = model(src, tgt_input)
             out = out.reshape(-1, out.size(-1))
-            tgt_out = tgt_out.reshape(-1)
+            tgt_output = tgt_output.reshape(-1)
 
-            loss = criterion(out, tgt_out)
+            loss = criterion(out, tgt_output)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -167,11 +167,10 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
             pbar.set_postfix({"loss": f"{loss.item():.4f}"})
 
         # Evaluate after each epoch
-        val_loss, val_tok_acc, val_seq_acc = evaluate(model, test_loader, criterion, pad_idx, hyperparams["device"])
+        val_loss, val_token_acc, val_seq_acc = evaluate(model, test_loader, criterion, pad_idx, hyperparams["device"])
         print(f"\nEpoch {epoch+1} Validation:")
-        print(f"Loss: {val_loss:.4f} | Token Acc: {val_tok_acc:.4f} | Seq Acc: {val_seq_acc:.4f}")
+        print(f"Loss: {val_loss:.4f} | Token Acc: {val_token_acc:.4f} | Seq Acc: {val_seq_acc:.4f}")
 
-        # Save if best
         if val_seq_acc > best_seq_acc:
             best_seq_acc = val_seq_acc
             torch.save(
@@ -185,40 +184,25 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
                 CHECKPOINT_DIR / f"best_model_{model_suffix}.pt",
             )
 
+    # Final evaluation with greedy decoding
     print("\nFinal Greedy Decode Evaluation:")
     model.eval()
     token_accs = []
-    seq_accs   = []
+    seq_accs = []
 
     with torch.no_grad():
-        for batch in tqdm(test_loader, desc="Final Greedy Evaluation"):
+        for batch in tqdm(test_loader, desc="Greedy Evaluation"):
             src = batch["src"].to(hyperparams["device"])
             tgt = batch["tgt"].to(hyperparams["device"])
 
-            # Perform greedy decode
-            pred = greedy_decode(
-                model, src, max_len=tgt.size(1),
-                start_symbol=bos_idx, end_symbol=eos_idx,
-                device=hyperparams["device"]
-            )
-
-            # Evaluate
-            tok_acc, s_acc = calculate_accuracy(pred[:, 1:], tgt[:, 1:], pad_idx)
+            pred = greedy_decode(model, src, max_len=tgt.size(1), start_symbol=bos_idx, end_symbol=eos_idx, device=hyperparams["device"])
+            tok_acc, seq_acc = calculate_accuracy(pred[:, 1:], tgt[:, 1:], pad_idx)
             token_accs.append(tok_acc)
-            seq_accs.append(s_acc)
+            seq_accs.append(seq_acc)
 
-    final_tok_acc = sum(token_accs) / len(token_accs)
+    final_token_acc = sum(token_accs) / len(token_accs)
     final_seq_acc = sum(seq_accs) / len(seq_accs)
 
-    print(f"Greedy Decode => Token Acc: {final_tok_acc:.4f}, Seq Acc: {final_seq_acc:.4f}")
+    print(f"Final Greedy Decode => Token Acc: {final_token_acc:.4f} | Seq Acc: {final_seq_acc:.4f}")
 
-    return model, final_tok_acc, final_seq_acc
-
-
-def main(train_path, test_path, model_suffix, hyperparams, random_seed=42, **kwargs):
-    """
-    For backward compatibility with your 'run_all_variations' script,
-    we define a 'main' that calls 'train'. 
-    """
-    return train(train_path, test_path, hyperparams, model_suffix, random_seed)
-
+    return model, final_token_acc, final_seq_acc
