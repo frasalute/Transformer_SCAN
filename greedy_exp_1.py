@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from train_greedsearch import main
+from train_greedsearch import train
 
 def get_dataset_pairs():
     """Get pairs of training and test dataset paths."""
@@ -26,7 +26,7 @@ def run_all_variations(n_runs=3):
         "dropout": 0.05,
         "learning_rate": 7e-4,
         "batch_size": 64,
-        "epochs":20,
+        "epochs":50,
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     }
 
@@ -45,7 +45,7 @@ def run_all_variations(n_runs=3):
             
             # Call the main function
             try:
-                g_accuracy, seq_acc, accuracy = main(
+                g_accuracy, seq_acc, accuracy = train(
                     train_path=train_path,
                     test_path=test_path,
                     hyperparams=hyperparams,
