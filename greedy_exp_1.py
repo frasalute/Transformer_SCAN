@@ -1,6 +1,8 @@
 import torch
 import numpy as np
-from train_greedsearch import train
+from train_greedysearch import train
+import matplotlib.pyplot as plt
+
 
 def get_dataset_pairs():
     """Get pairs of training and test dataset paths."""
@@ -13,7 +15,7 @@ def get_dataset_pairs():
         pairs.append((train_path, test_path, size))
     return pairs
 
-def run_all_variations(n_runs=3):
+def run_all_variations(n_runs=1):
     """Run training multiple times for all dataset size variations with different seeds."""
     results = {}
 
@@ -73,6 +75,45 @@ def run_all_variations(n_runs=3):
         print(f"Individual runs: {', '.join(f'{acc[0]:.4f}' for acc in accuracies)}")
         print(f"Mean Greedy Accuracy: {mean[1]:.4f} ± {std[1]:.4f}")
         print(f"Individual runs: {', '.join(f'{acc[1]:.4f}' for acc in accuracies)}\n")
+
+       # Add histogram generation at the end
+        sizes = [size[1:] for size in results.keys()]  # Extract dataset sizes
+        teacher_means = [np.mean([(acc[0] if not torch.is_tensor(acc[0]) else acc[0].cpu().numpy())
+                                for acc in results[size]]) for size in results.keys()]
+        teacher_stds = [np.std([(acc[0] if not torch.is_tensor(acc[0]) else acc[0].cpu().numpy())
+                                for acc in results[size]]) for size in results.keys()]
+        greedy_means = [np.mean([(acc[1] if not torch.is_tensor(acc[1]) else acc[1].cpu().numpy())
+                                for acc in results[size]]) for size in results.keys()]
+        greedy_stds = [np.std([(acc[1] if not torch.is_tensor(acc[1]) else acc[1].cpu().numpy())
+                            for acc in results[size]]) for size in results.keys()]
+
+        x = np.arange(len(sizes))  # Positions for the bars
+        width = 0.35  # Bar width
+
+        plt.figure(figsize=(12, 8))
+
+        # Teacher bars
+        plt.bar(x - width / 2, teacher_means, width, yerr=teacher_stds, capsize=5,
+                label="Teacher", color="teal", alpha=0.7)
+
+        # Greedy bars
+        plt.bar(x + width / 2, greedy_means, width, yerr=greedy_stds, capsize=5,
+                label="Greedy", color="gold", alpha=0.7)
+
+        # Add labels, title, legend
+        plt.xlabel("Dataset Size (%)", fontsize=14)
+        plt.ylabel("Accuracy (%)", fontsize=14)
+        plt.title("Mean Accuracy with Standard Deviation", fontsize=16)
+        plt.xticks(x, labels=[f"{size}%" for size in sizes], fontsize=12)
+        plt.yticks(fontsize=12)
+        plt.legend(fontsize=12)
+        plt.grid(axis="y", linestyle="--", alpha=0.7)
+
+        # Save and show plot
+        plt.tight_layout()
+        plt.savefig("experiment1_results_plot.png")
+        plt.show()
+
 
 if __name__ == "__main__":
     run_all_variations()
