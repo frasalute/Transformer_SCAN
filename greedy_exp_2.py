@@ -86,7 +86,7 @@ def plot_results(results, filename_prefix, title_suffix):
     plt.close()
 
 
-def run_experiment():
+def run_experiment(n_runs=3):
     """Run Experiment 2 with greedy and oracle decoding."""
     # Initialize hyperparameters
     hyperparams = {
