@@ -1,7 +1,7 @@
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-from train_beamsearch import train, beam_search_decode, calculate_accuracy
+from beam_search.train_beamsearch import train, beam_search_decode, calculate_accuracy
 import torch
 from dataset import SCANDataset
 from torch.utils.data import Subset, DataLoader

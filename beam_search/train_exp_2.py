@@ -2,7 +2,7 @@ import sys
 import json
 import matplotlib.pyplot as plt
 sys.path.append('/Users/francescasalute/Dropbox/Mac/Documents/Master in Data Science/Third Semester/Advanced NLP/Transformer_SCAN')
-from train_beamsearch import train, beam_search_decode, calculate_accuracy
+from beam_search.train_beamsearch import train, beam_search_decode, calculate_accuracy
 import torch
 import numpy as np
 from dataset import SCANDataset
