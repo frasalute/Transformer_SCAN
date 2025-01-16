@@ -101,9 +101,9 @@ def print_results_and_plot(results):
     # Plotting the Token-Level Accuracy
     plt.figure(figsize=(12, 6))
     plt.bar(x - width / 2, best_token_accuracies, width, yerr=token_stds, capsize=5,
-            label="Best Token Accuracy", color="skyblue", alpha=0.8)
+            label="Best Token Accuracy", color="teal", alpha=0.8)
     plt.bar(x + width / 2, best_seq_accuracies, width, yerr=seq_stds, capsize=5,
-            label="Best Sequence Accuracy", color="orange", alpha=0.8)
+            label="Best Sequence Accuracy", color="gold", alpha=0.8)
 
     # Add labels and legend
     plt.xlabel("Number of Composed Commands Used for Training", fontsize=14)

@@ -2,7 +2,7 @@ from torch.utils.data import Dataset
 from transformers import T5Tokenizer
 
 class SCANDataset(Dataset): 
-    def __init__(self, file_path, tokenizer, max_len=128): 
+    def __init__(self, file_path, tokenizer, max_len=512): 
         self.file_path = file_path 
         self.tokenizer = tokenizer
         self.max_len = max_len

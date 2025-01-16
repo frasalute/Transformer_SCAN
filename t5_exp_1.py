@@ -21,9 +21,9 @@ def run_experiment():
     tokenizer = T5Tokenizer.from_pretrained("t5-small")  # Load the tokenizer
     results = {}
     hyperparams = {
-        "learning_rate": 5e-5,
-        "batch_size": 8,
-        "epochs": 10,
+        "learning_rate": 7e-4,
+        "batch_size": 64,
+        "epochs": 50,
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     }
 
@@ -46,16 +46,21 @@ def run_experiment():
     token_accs = [results[size][0] for size in results]
     seq_accs = [results[size][1] for size in results]
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(sizes, token_accs, label="Token Accuracy", marker="o")
-    plt.plot(sizes, seq_accs, label="Sequence Accuracy", marker="s")
-    plt.xlabel("Training Dataset Size (%)")
-    plt.ylabel("Accuracy")
-    plt.title("Token and Sequence Accuracy vs Dataset Size")
-    plt.legend()
-    plt.grid()
+    bar_width = 0.35  # Adjust the width of bars
+    x_indices = np.arange(len(sizes))  # Positions for the bars
 
-    output_path = "experiment_results.png"  
+    plt.figure(figsize=(10, 6))
+    plt.bar(x_indices - bar_width / 2, token_accs, width=bar_width, label="Token Accuracy", color="teal")
+    plt.bar(x_indices + bar_width / 2, seq_accs, width=bar_width, label="Sequence Accuracy", color="gold")
+
+    plt.xlabel("Dataset Size (%)")
+    plt.ylabel("Accuracy")
+    plt.title("Token and Sequence Accuracy")
+    plt.xticks(x_indices, sizes)  # Set x-ticks to dataset sizes
+    plt.legend()
+    plt.grid(axis="y")  # Add gridlines only along the y-axis
+
+    output_path = "experiment1_results_histogram.png"
     plt.savefig(output_path, format="png", dpi=300)
     print(f"Figure saved to {output_path}")
 
