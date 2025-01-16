@@ -1,5 +1,5 @@
 from t5_dataset import SCANDataset
-from t5_model import fine_tune_t5
+from t5_model_large import fine_tune_t5
 from transformers import T5Tokenizer
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,14 +18,16 @@ def get_dataset_pairs():
 
 def run_experiment():
     """Run Experiment 1."""
-    tokenizer = T5Tokenizer.from_pretrained("t5-small")  
+    tokenizer = T5Tokenizer.from_pretrained("t5-large")  # Updated to T5-large
     results = {}
     hyperparams = {
-        "learning_rate": 7e-4,
-        "batch_size": 64,
-        "epochs": 50,
+        "learning_rate": 3e-4,  
+        "batch_size": 32,  
+        "epochs": 20,  
+        "gradient_accumulation_steps": 4,  
+        "weight_decay": 1e-2,  
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    } # here I can experiment and fine tune the hyperparameters
+    }  
 
     for train_path, test_path, size in get_dataset_pairs():
         print(f"Running for dataset size p{size}...")
