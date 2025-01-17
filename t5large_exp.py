@@ -18,28 +18,28 @@ def get_dataset_pairs():
 
 def run_experiment():
     """Run Experiment 1."""
-    tokenizer = T5Tokenizer.from_pretrained("t5-large")  # Updated to T5-large
+    tokenizer = T5Tokenizer.from_pretrained("t5-base", legacy=False)  # tried for both large and base
     results = {}
     hyperparams = {
-        "learning_rate": 3e-4,  
-        "batch_size": 32,  
+        "learning_rate": 1e-5,  
+        "batch_size": 8, 
         "epochs": 20,  
-        "gradient_accumulation_steps": 4,  
-        "weight_decay": 1e-2,  
+        "gradient_accumulation_steps": 8,  
+        "weight_decay": 1e-3,  
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    }  
+    }  # these hyperparameters ar very low, they don't overload memory but at the same time don't actually allow the model to learn
 
     for train_path, test_path, size in get_dataset_pairs():
         print(f"Running for dataset size p{size}...")
-        train_dataset = SCANDataset(train_path, tokenizer)  # Pass tokenizer to SCANDataset
-        test_dataset = SCANDataset(test_path, tokenizer)  # Pass tokenizer to SCANDataset
+        train_dataset = SCANDataset(train_path, tokenizer)  
+        test_dataset = SCANDataset(test_path, tokenizer)  
         _, token_acc, seq_acc = fine_tune_t5(
             train_dataset=train_dataset,
             test_dataset=test_dataset,
             hyperparams=hyperparams,
             model_suffix=f"p{size}",
             random_seed=42,
-            tokenizer=tokenizer  # Pass tokenizer to fine_tune_t5
+            tokenizer=tokenizer  
         )
         results[size] = (token_acc, seq_acc)
 

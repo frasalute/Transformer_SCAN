@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
-from transformers import T5Config, T5ForConditionalGeneration, AdamW
+from transformers import T5ForConditionalGeneration, Adafactor
 import numpy as np
 
 def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_seed, tokenizer):
@@ -9,15 +9,8 @@ def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
 
-    # Configure the T5 model
-    config = T5Config(
-        d_model=hyperparams["emb_dim"],          # EMB_DIM
-        num_layers=hyperparams["n_layers"],     # N_LAYERS
-        num_heads=hyperparams["n_heads"],       # N_HEADS
-        d_ff=hyperparams["forward_dim"],        # FORWARD_DIM
-        dropout_rate=hyperparams["dropout"]     # DROPOUT
-    )
-    model = T5ForConditionalGeneration(config)
+    # Load model
+    model = T5ForConditionalGeneration.from_pretrained("t5-small")
     model.to(hyperparams["device"])
 
     # Prepare DataLoaders
@@ -25,11 +18,25 @@ def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_
     test_dataloader = DataLoader(test_dataset, batch_size=hyperparams["batch_size"], shuffle=False)
 
     # Set up optimizer
-    optimizer = AdamW(model.parameters(), lr=hyperparams["learning_rate"])
+    optimizer = Adafactor(
+        model.parameters(),
+        lr=hyperparams["learning_rate"],
+        scale_parameter=True,
+        relative_step=False
+    )
+
+    # Dynamic epoch calculation based on dataset size
+    dataset_size = len(train_dataset)
+    if (100000 // dataset_size) > 100:
+        dynamic_epochs = (100000 // dataset_size)
+    else:
+        dynamic_epochs = min(20, (100000 // dataset_size))
+
+    print(f"Dynamic Epochs: {dynamic_epochs}")
 
     # Training loop
     model.train()
-    for epoch in range(hyperparams["epochs"]):
+    for epoch in range(dynamic_epochs):
         total_loss = 0
         for batch in train_dataloader:
             optimizer.zero_grad()
@@ -50,7 +57,7 @@ def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_
 
             total_loss += loss.item()
 
-        print(f"Epoch {epoch + 1}/{hyperparams['epochs']}, Loss: {total_loss / len(train_dataloader)}")
+        print(f"Epoch {epoch + 1}/{dynamic_epochs}, Loss: {total_loss / len(train_dataloader)}")
 
     # Evaluation
     model.eval()
@@ -64,7 +71,7 @@ def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_
             labels = batch["labels"].to(hyperparams["device"])
 
             # Generate predictions
-            outputs = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_length=50)
+            outputs = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_length=hyperparams["max_length"])
             predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True)
             targets = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
