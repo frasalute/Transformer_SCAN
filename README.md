@@ -22,7 +22,7 @@ The project includes implementations of various Transformer models, dataset load
 - **`adafactort5_exp1.py`**: Conducts Experiment 1 using Adafactor optimization.
 - **`adafactort5_exp2.py`**: Conducts Experiment 2 using Adafactor optimization.
 
-#### Greedy Decoding Experiments on All you need is Attention Transformer
+#### Greedy Decoding Experiments on Attention is all you need Transformer
 - **`greedy_exp_1.py`**: Experiment 1 with Greedy decoding.
 - **`greedy_exp_2.py`**: Experiment 2 with Greedy decoding.
 - **`greedy_exp_3.py`**: Experiment 3 with Greedy decoding.
@@ -36,7 +36,7 @@ The project includes implementations of various Transformer models, dataset load
 #### LoRA Experiments
 - **`lora_exp.py`**: Conducts experiments using LoRA.
 
-### Training on All you need is Attention Transformer
+### Training on Attention is all you need Transformer
 - **`train_greedysearch.py`**: Implements training using Greedy Search decoding.
 
 ## Setup Instructions
