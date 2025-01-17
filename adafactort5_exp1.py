@@ -7,7 +7,7 @@ import torch
 
 def get_dataset_pairs():
     """Get pairs of training and test dataset paths."""
-    base_path = "/work/Transformer_SCAN/data/simple_split/size_variations"
+    base_path = "data/simple_split/size_variations"
     sizes = ["1", "2", "4", "8", "16", "32", "64"]
     pairs = []
     for size in sizes:
@@ -21,7 +21,7 @@ def run_experiment():
     tokenizer = T5Tokenizer.from_pretrained("t5-small")  
     results = {}
 
-    # Hyperparameters
+    
     hyperparams = {
         "learning_rate": 1e-4,  
         "batch_size": 64,      
@@ -44,13 +44,13 @@ def run_experiment():
         )
         results[size] = (token_acc, seq_acc)
 
-    # Visualization
+    
     sizes = [int(size) for size in results.keys()]
     token_accs = [results[size][0] for size in results]
     seq_accs = [results[size][1] for size in results]
 
-    bar_width = 0.35  # Adjust the width of bars
-    x_indices = np.arange(len(sizes))  # Positions for the bars
+    bar_width = 0.35  
+    x_indices = np.arange(len(sizes))  
 
     plt.figure(figsize=(10, 6))
     plt.bar(x_indices - bar_width / 2, token_accs, width=bar_width, label="Token Accuracy", color="teal")
@@ -59,9 +59,9 @@ def run_experiment():
     plt.xlabel("Dataset Size (%)")
     plt.ylabel("Accuracy")
     plt.title("Token and Sequence Accuracy")
-    plt.xticks(x_indices, sizes)  # Set x-ticks to dataset sizes
+    plt.xticks(x_indices, sizes)  
     plt.legend()
-    plt.grid(axis="y")  # Add gridlines only along the y-axis
+    plt.grid(axis="y")  
 
     output_path = "experiment1_results_histogram.png"
     plt.savefig(output_path, format="png", dpi=300)

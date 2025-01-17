@@ -5,19 +5,19 @@ import numpy as np
 
 def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_seed, tokenizer):
     """Fine-tune the T5 model on the training dataset and evaluate on the test dataset."""
-    # Set random seed
+    
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
 
-    # Load model
+    
     model = T5ForConditionalGeneration.from_pretrained("t5-small")
     model.to(hyperparams["device"])
 
-    # Prepare DataLoaders
+    
     train_dataloader = DataLoader(train_dataset, batch_size=hyperparams["batch_size"], shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=hyperparams["batch_size"], shuffle=False)
 
-    # Set up optimizer
+    
     optimizer = Adafactor(
         model.parameters(),
         lr=hyperparams["learning_rate"],
@@ -25,7 +25,7 @@ def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_
         relative_step=False
     )
 
-    # Dynamic epoch calculation based on dataset size
+    
     dataset_size = len(train_dataset)
     if (100000 // dataset_size) > 100:
         dynamic_epochs = (100000 // dataset_size)
@@ -34,32 +34,32 @@ def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_
 
     print(f"Dynamic Epochs: {dynamic_epochs}")
 
-    # Training loop
+    
     model.train()
     for epoch in range(dynamic_epochs):
         total_loss = 0
         for batch in train_dataloader:
             optimizer.zero_grad()
 
-            # Move batch to device
+            
             input_ids = batch["input_ids"].to(hyperparams["device"])
             attention_mask = batch["attention_mask"].to(hyperparams["device"])
             labels = batch["labels"].to(hyperparams["device"])
 
-            # Forward pass
+            
             outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
             loss = outputs.loss
 
-            # Backward pass
+            
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  
             optimizer.step()
 
             total_loss += loss.item()
 
         print(f"Epoch {epoch + 1}/{dynamic_epochs}, Loss: {total_loss / len(train_dataloader)}")
 
-    # Evaluation
+    
     model.eval()
     token_accuracies = []
     sequence_accuracies = []
@@ -70,7 +70,7 @@ def fine_tune_t5(train_dataset, test_dataset, hyperparams, model_suffix, random_
             attention_mask = batch["attention_mask"].to(hyperparams["device"])
             labels = batch["labels"].to(hyperparams["device"])
 
-            # Generate predictions
+            
             outputs = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_length=hyperparams["max_length"])
             predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True)
             targets = tokenizer.batch_decode(labels, skip_special_tokens=True)

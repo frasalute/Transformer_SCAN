@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 def get_dataset_pairs():
     """Get pairs of training and test dataset paths."""
-    base_path = "/teamspace/studios/this_studio/Transformer_SCAN/data/simple_split/size_variations"
+    base_path = "data/simple_split/size_variations"
     sizes = ["1", "2", "4", "8", "16", "32", "64"]
     pairs = []
     for size in sizes:
@@ -19,7 +19,7 @@ def run_all_variations(n_runs=1):
     """Run training multiple times for all dataset size variations with different seeds."""
     results = {}
 
-    # Initialize hyperparameters
+
     hyperparams = {
         "emb_dim": 128,
         "n_layers": 1,
@@ -32,7 +32,7 @@ def run_all_variations(n_runs=1):
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     }
 
-    # Initialize results dictionary
+    
     for _, _, size in get_dataset_pairs():
         results[f"p{size}"] = []
 
@@ -45,7 +45,7 @@ def run_all_variations(n_runs=1):
             print(f"\nTraining dataset size p{size}")
             print(f"Train path: {train_path}, Test path: {test_path}")
             
-            # Call the train function
+            
             try:
                 model, token_acc, seq_acc = train(
                     train_path=train_path,
@@ -59,13 +59,13 @@ def run_all_variations(n_runs=1):
                 print(f"Error during training for size {size}: {e}")
                 continue
 
-    # Final Results Summary
+    
     print("\nFinal Results Summary:")
     print("=" * 50)
     print("Dataset Size | Mean Token Accuracy ± Std Dev | Mean Sequence Accuracy ± Std Dev")
     print("-" * 50)
 
-    # Prepare data for the graph
+    
     sizes = []
     token_means = []
     token_stds = []
@@ -85,26 +85,26 @@ def run_all_variations(n_runs=1):
         token_stds.append(token_std)
         seq_means.append(seq_mean)
         seq_stds.append(seq_std)
-        sizes.append(size[1:])  # Remove 'p' prefix for graph labels
+        sizes.append(size[1:])  
 
         print(f"{size:11} | {token_mean:.4f} ± {token_std:.4f} | {seq_mean:.4f} ± {seq_std:.4f}")
         print("-" * 50)
 
-    # Generate the bar graph
-    x = np.arange(len(sizes))  # Positions for the bars
-    width = 0.35  # Bar width
+    
+    x = np.arange(len(sizes))  
+    width = 0.35  
 
     plt.figure(figsize=(12, 8))
 
-    # Token bars
+    
     plt.bar(x - width / 2, token_means, width, yerr=token_stds, capsize=5,
             label="Token Accuracy", color="teal", alpha=0.7)
 
-    # Sequence bars
+    
     plt.bar(x + width / 2, seq_means, width, yerr=seq_stds, capsize=5,
             label="Sequence Accuracy", color="gold", alpha=0.7)
 
-    # Add labels, title, legend
+    
     plt.xlabel("Dataset Size (%)", fontsize=14)
     plt.ylabel("Accuracy (%)", fontsize=14)
     plt.title("Accuracy for Token and Sequence", fontsize=16)
@@ -113,7 +113,7 @@ def run_all_variations(n_runs=1):
     plt.legend(fontsize=12)
     plt.grid(axis="y", linestyle="--", alpha=0.7)
 
-    # Save and show plot
+    
     plt.tight_layout()
     plt.savefig("experiment1_results_plot.png")
     plt.show()

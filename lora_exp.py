@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import torch
 
 def get_dataset_pairs():
-    base_path = "/teamspace/studios/this_studio/Transformer_SCAN/data/simple_split/size_variations"
+    base_path = "data/simple_split/size_variations"
     sizes = ["1", "2", "4", "8", "16", "32", "64"]
     pairs = []
     for size in sizes:

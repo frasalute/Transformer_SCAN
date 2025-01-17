@@ -13,32 +13,27 @@ def greedy_decode(model, src, max_len, start_symbol, end_symbol, device):
     model.eval()
     src = src.to(device)
 
-    # Initialize with start symbol
     ys = torch.ones(src.size(0), 1).fill_(start_symbol).long().to(device)
     finished = torch.zeros(src.size(0), dtype=torch.bool, device=device)
 
     for _ in range(max_len - 1):
-        out = model(src, ys)  # [batch_size, seq_len, vocab_size]
-        probs = out[:, -1, :]  # Get probabilities of the last token
-        next_word = probs.argmax(dim=-1, keepdim=True)  # Get the most likely next word
+        out = model(src, ys)  
+        probs = out[:, -1, :]  
+        next_word = probs.argmax(dim=-1, keepdim=True)  
 
-        # Update only unfinished sequences
         next_word = torch.where(finished.unsqueeze(1), ys[:, -1:], next_word)
         ys = torch.cat([ys, next_word], dim=1)
 
-        # Mark finished if next_word is <EOS>
         is_eos = next_word.squeeze(1) == end_symbol
         finished |= is_eos
 
-        # Stop if all sequences are finished
         if finished.all():
             break
 
-    # Truncate sequences after <EOS>
     for i in range(ys.size(0)):
         eos_indices = (ys[i] == end_symbol).nonzero(as_tuple=True)[0]
-        if eos_indices.numel() > 0:  # If <EOS> is found
-            ys[i, eos_indices[0] + 1:] = end_symbol  # Truncate at <EOS>
+        if eos_indices.numel() > 0:  
+            ys[i, eos_indices[0] + 1:] = end_symbol  
 
     return ys
 
@@ -54,11 +49,11 @@ def calculate_accuracy(pred, target, pad_idx):
     elif target.size(1) < max_len:
         target = torch.cat([target, torch.full((batch_size, max_len - target.size(1)), pad_idx, device=target.device)], dim=1)
 
-    # Token-level accuracy
+    
     mask = target != pad_idx
     token_acc = (pred[mask] == target[mask]).float().mean().item()
 
-    # Sequence-level accuracy (exact match)
+    
     seq_acc = ((pred == target) | ~mask).all(dim=1).float().mean().item()
 
     return token_acc, seq_acc
@@ -86,7 +81,7 @@ def evaluate(model, data_loader, criterion, pad_idx, device):
             loss = criterion(out, tgt_output)
             total_loss += loss.item()
 
-            # Teacher-forced token and sequence accuracy
+            
             pred = out.argmax(dim=-1).view(tgt.size(0), -1)
             tok_acc, seq_acc = calculate_accuracy(pred, tgt[:, 1:], pad_idx)
             token_accs.append(tok_acc)
@@ -108,7 +103,7 @@ def train(train_path, test_path, hyperparams, model_suffix, random_seed):
     CHECKPOINT_DIR = Path("checkpoints")
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
-    # Load datasets
+    
     train_data = SCANDataset(train_path)
     test_data = SCANDataset(test_path)
 

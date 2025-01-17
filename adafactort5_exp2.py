@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 def run_experiment_2():
     """Run Experiment 2: Length Generalization."""
-    # Hyperparameters
+
     hyperparams = {
         "learning_rate": 1e-4,  
         "batch_size": 64,      
@@ -16,20 +16,20 @@ def run_experiment_2():
         "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     }
 
-    # Dataset paths
-    train_path = "/work/Transformer_SCAN/data/length_split/tasks_train_length.txt"
-    test_path = "/work/Transformer_SCAN/data/length_split/tasks_test_length.txt"
+    
+    train_path = "data/length_split/tasks_train_length.txt"
+    test_path = "data/length_split/tasks_test_length.txt"
 
-    # Load tokenizer (T5-small)
+    
     tokenizer = T5Tokenizer.from_pretrained("t5-small")
 
-    # Load datasets
+    
     train_dataset = SCANDataset(train_path, tokenizer)
     test_dataset  = SCANDataset(test_path,  tokenizer)
 
     print(f"Train set size: {len(train_dataset)}, Test set size: {len(test_dataset)}")
 
-    # Fine-tune the model
+    
     model, token_acc, seq_acc = fine_tune_t5(
         train_dataset=train_dataset,
         test_dataset=test_dataset,
@@ -39,7 +39,7 @@ def run_experiment_2():
         tokenizer=tokenizer
     )
 
-    # Evaluate
+    
     evaluate_and_plot(test_dataset, model, tokenizer, hyperparams)
 
 def evaluate_and_plot(test_dataset, model, tokenizer, hyperparams):
@@ -49,15 +49,15 @@ def evaluate_and_plot(test_dataset, model, tokenizer, hyperparams):
     We also compute the overall mean token and sequence accuracy.
     """
 
-    # Dicts to store token accuracies by action/command length
+    
     token_accuracies_by_action_length = {}
     token_accuracies_by_command_length = {}
 
-    # Dicts to store sequence accuracies by action/command length
+    
     sequence_accuracies_by_action_length = {}
     sequence_accuracies_by_command_length = {}
 
-    # --- Overall accuracies across *all* test examples ---
+    
     all_token_accs = []
     all_seq_accs   = []
 
@@ -74,7 +74,7 @@ def evaluate_and_plot(test_dataset, model, tokenizer, hyperparams):
             attention_mask = batch["attention_mask"].to(hyperparams["device"])
             labels = batch["labels"].to(hyperparams["device"])
 
-            # Generate predictions
+            
             outputs = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -87,20 +87,20 @@ def evaluate_and_plot(test_dataset, model, tokenizer, hyperparams):
                 target_tokens = target.split()
                 pred_tokens   = pred.split()
 
-                # Token-level accuracy
+                
                 if len(target_tokens) > 0:
                     token_acc = sum(p == t for p, t in zip(pred_tokens, target_tokens)) / len(target_tokens)
                 else:
                     token_acc = 0.0
 
-                # Sequence-level accuracy (exact match)
+                
                 seq_acc = 1.0 if pred == target else 0.0
 
-                # Accumulate for overall mean
+                
                 all_token_accs.append(token_acc)
                 all_seq_accs.append(seq_acc)
 
-                # Get lengths
+                
                 command_length = len(tokenizer.decode(command, skip_special_tokens=True).split())
                 action_length  = len(target_tokens)
 
@@ -110,13 +110,13 @@ def evaluate_and_plot(test_dataset, model, tokenizer, hyperparams):
                 print(f"Action Length: {action_length}, Command Length: {command_length}, "
                       f"Token Accuracy: {token_acc:.3f}, Sequence Accuracy: {seq_acc}")
 
-                # Group token accuracy by action length
+                
                 token_accuracies_by_action_length.setdefault(action_length, []).append(token_acc)
-                # Group token accuracy by command length
+                
                 token_accuracies_by_command_length.setdefault(command_length, []).append(token_acc)
-                # Group sequence accuracy by action length
+                
                 sequence_accuracies_by_action_length.setdefault(action_length, []).append(seq_acc)
-                # Group sequence accuracy by command length
+                
                 sequence_accuracies_by_command_length.setdefault(command_length, []).append(seq_acc)
 
     # --- Compute mean accuracies per length ---
@@ -150,7 +150,7 @@ def evaluate_and_plot(test_dataset, model, tokenizer, hyperparams):
     print(f"Overall Mean Token Accuracy:    {overall_token_acc:.3f}")
     print(f"Overall Mean Sequence Accuracy: {overall_seq_acc:.3f}")
 
-    # Plot the results
+    
     plot_results(token_accuracies_by_action_length,
                  token_accuracies_by_command_length,
                  sequence_accuracies_by_action_length,
@@ -167,13 +167,13 @@ def plot_results(token_action_accs,
 
     print("\nPlotting results...")
 
-    # Convert from fraction [0,1] to percent [0,100]
+    
     token_action_vals = [v * 100 for v in token_action_accs.values()]
     token_command_vals = [v * 100 for v in token_command_accs.values()]
     seq_action_vals = [v * 100 for v in seq_action_accs.values()]
     seq_command_vals = [v * 100 for v in seq_command_accs.values()]
 
-    # Sort keys
+    
     sorted_action_lengths = sorted(set(token_action_accs.keys()) | set(seq_action_accs.keys()))
     sorted_command_lengths = sorted(set(token_command_accs.keys()) | set(seq_command_accs.keys()))
 

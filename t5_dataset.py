@@ -26,7 +26,7 @@ class SCANDataset(Dataset):
         src_text = self.data[idx]["command"]
         tgt_text = self.data[idx]["action"]
         
-        # Tokenize source and target texts
+        
         src_encoding = self.tokenizer(
             src_text, 
             max_length=self.max_len, 
@@ -43,7 +43,7 @@ class SCANDataset(Dataset):
         )
         
         return {
-            "input_ids": src_encoding["input_ids"].squeeze(0),  # Remove batch dimension
+            "input_ids": src_encoding["input_ids"].squeeze(0),  
             "attention_mask": src_encoding["attention_mask"].squeeze(0),
             "labels": tgt_encoding["input_ids"].squeeze(0)
         }
@@ -52,7 +52,7 @@ class SCANDataset(Dataset):
 if __name__ == "__main__": 
     tokenizer = T5Tokenizer.from_pretrained("t5-small")
     dataset = SCANDataset(
-        "/work/Transformer_SCAN/data/simple_split/tasks_train_simple.txt", 
+        "data/simple_split/tasks_train_simple.txt", 
         tokenizer
     )
     
