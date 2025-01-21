@@ -89,6 +89,9 @@ The experiments yielded the following key findings:
 Detailed results are available in the project report.
 
 ## Limitations
-- Computational constraints, suggested to run with at least 3GPU. 
+- Computational constraints, suggested to run with at least 3GPU.
+
+## Get Involved
+Feel free to fork the repository, create a branch, and submit a pull request with your contributions. If you have questions, suggestions, or want to connect, reach out via email or GitHub!😊
 
 
